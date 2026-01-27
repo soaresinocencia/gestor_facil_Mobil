@@ -1,0 +1,43 @@
+
+============================================================
+                    GESTOR FÁCIL - MANUAL TÉCNICO
+============================================================
+
+1. INICIALIZAÇÃO
+O sistema "Gestor Fácil" utiliza uma base de dados local SQLite
+chamada 'gestor_facil.db' na pasta 'db/'. Este arquivo é criado 
+automaticamente na primeira execução.
+
+2. BACKUP
+O sistema realiza backups automáticos da base de dados para a
+pasta 'backups/'. Recomenda-se copiar esta pasta para um
+dispositivo externo (Pen Drive/Google Drive) regularmente.
+
+3. SUPORTE TÉCNICO
+Em caso de falhas ou necessidade de manutenção, contacte:
+Desenvolvedor: Soares Inocencia Massaete (+258 84 934 3350)
+
+4. COMO CADASTRAR PRODUTOS
+- Vá ao menu lateral e clique em "Stock / Armazém".
+- Na área "Novo Produto", preencha:
+  * Nome do Produto (ex: Arroz 1kg)
+  * Custo (ex: 40.00)
+  * Preço de Venda (ex: 50.00)
+  * Quantidade Atual (ex: 100)
+  * Mínimo (ex: 10 - para alerta de stock baixo)
+- Clique no botão VERDE "Adicionar Produto".
+- Para corrigir, selecione o produto na lista abaixo e use os botões 
+  "Atualizar" (Laranja) ou "Remover" (Vermelho).
+
+5. MODO OFFLINE
+O sistema opera 100% offline. A sincronização (Sync) armazena
+vendas locais marcadas com status '0' (Pendente) até que uma
+conexão seja restabelecida.
+
+5. REQUISITOS
+- Python 3.x
+- Bibliotecas: customtkinter, pandas, reportlab, Pillow
+
+============================================================
+Gerado automaticamente pelo sistema Gestor Fácil.
+============================================================

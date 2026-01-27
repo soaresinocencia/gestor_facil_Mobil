@@ -1,0 +1,48 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      run: |
+        pip install -r src/mobile/requirements.txt
+        pip install flet
+
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+
+    - name: Build APK via Flet
+      run: |
+        # Usamos o comando flet build apk apontando para a pasta mobile
+        # O parametro --module indica que é um modulo python e não um arquivo unico simples
+        flet build apk --project src/mobile/main.py --product "Gestor Facil" --org "com.gestorfacil.mobile" --verbose
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: gestor-facil-apk
+        path: build/apk/app-release.apk
