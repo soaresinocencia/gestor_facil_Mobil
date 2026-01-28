@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+dist/
+build/
+*.spec
+.vscode/
+.idea/
+gestor.db
+backups/
+outputs/
