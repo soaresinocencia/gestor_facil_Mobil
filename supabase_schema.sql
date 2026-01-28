@@ -1,5 +1,4 @@
 -- Tabela de Produtos
--- Armazena o catálogo e o estoque.
 create table if not exists produtos (
     id bigint primary key generated always as identity,
     nome text not null,
@@ -12,38 +11,48 @@ create table if not exists produtos (
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 -- Tabela de Vendas
--- Armazena o registro de vendas. Usaremos JSONB para os itens para simplificar a sincronização.
 create table if not exists vendas (
     id bigint primary key generated always as identity,
     local_id integer,
-    -- ID original no SQLite (para evitar duplicatas)
     data_hora text,
     total_venda numeric,
     lucro_total numeric,
     cliente text,
     vendedor_nome text,
     itens jsonb,
-    -- Lista de produtos vendidos: [{"nome": "Coca", "qtd": 1, "preco": 50}, ...]
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 -- Tabela de Usuários
--- Para login e controle de acesso.
 create table if not exists usuarios (
     id bigint primary key generated always as identity,
     usuario text unique,
     nome_completo text,
     senha text,
-    -- Hash
     cargo text,
     status text default 'ativo',
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
--- Habilitar RLS (Row Level Security) é uma boa prática, 
--- mas para este primeiro passo vamos deixar aberto para facilitar a conexão via API Key Anon.
+-- Tabela de Licenças (NOVO)
+-- Controla quem pagou a mensalidade.
+create table if not exists licencas (
+    id bigint primary key generated always as identity,
+    cliente_id text not null unique,
+    -- Email ou Telefone do dono
+    data_validade date not null,
+    status text default 'ativo',
+    -- ativo, expirado, bloqueado
+    plano text default 'pro',
+    -- basico, pro
+    ultimo_pagamento date,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+-- RLS
 alter table produtos enable row level security;
 alter table vendas enable row level security;
 alter table usuarios enable row level security;
--- Políticas de acesso (Permitir tudo para quem tem a chave API por enquanto)
+alter table licencas enable row level security;
+-- Policies (Permissiva para MVP)
 create policy "Acesso Total Produtos" on produtos for all using (true);
 create policy "Acesso Total Vendas" on vendas for all using (true);
 create policy "Acesso Total Usuarios" on usuarios for all using (true);
+create policy "Acesso Total Licencas" on licencas for all using (true);

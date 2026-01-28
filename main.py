@@ -22,11 +22,28 @@ def main(page: ft.Page):
         )
     )
 
+    def check_saas_license():
+        """Verifica se o SaaS está pago."""
+        try:
+             # ID Hardcoded para MVP (Numero do Admin)
+             CLIENTE_ID = '258849343350'
+             service = SyncService()
+             status = service.verificar_licenca(CLIENTE_ID)
+             if status['status'] != 'ativo':
+                 return False
+        except:
+             # Se der erro grave, libera (fail-open) ou bloqueia? 
+             # Fail-open para nao prejudicar usuario offline sem motivo.
+             pass
+        return True
+
     def route_change(route):
         page.views.clear()
         
-        # Rota de Login
-        if page.route == "/login":
+        # Rotas
+        if page.route == "/blocked":
+             page.views.append(BlockView(page))
+        elif page.route == "/login":
             page.views.append(LoginView(page))
             
         # Rota Dashboard

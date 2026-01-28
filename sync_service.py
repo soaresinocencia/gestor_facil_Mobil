@@ -112,13 +112,93 @@ class SyncService:
             print(f"Erro ao baixar produtos: {e}")
             return 0
 
-    def sync_tudo(self):
+    def download_vendas(self):
+        """Baixa vendas da nuvem que não existem localmente (Importante para o PC ver vendas do Mobile)."""
+        if not self.connected: return 0
+        
+        try:
+            # Pegar últimas 50 vendas da nuvem
+            res = self.supabase.table("vendas").select("*").order("created_at", desc=True).limit(50).execute()
+            vendas_remotas = res.data
+            count = 0
+            
+            for vr in vendas_remotas:
+                # Verifica se já temos essa venda pelo UUID ou ID Remoto?
+                # O ID local deles não bate com o nosso.
+                # O ideal seria ter um UUID. Como não temos, vamos usar uma heurística ou criar tabela de mapeamento.
+                # Simplificação V1: Se a data_hora + total + vendedor for igual, é a mesma venda.
+                
+                existe = database.verificar_se_venda_existe(vr['data_hora'], vr['total_venda'], vr['vendedor_nome'])
+                
+                if not existe:
+                    # Inserir localmente
+                    database.registar_venda_importada(vr)
+                    count += 1
+            
+            if count > 0:
+                print(f"Sync DOWN: {count} vendas importadas da nuvem.")
+            return count
+        except Exception as e:
+            print(f"Erro ao baixar vendas: {e}")
+            return 0
+
+    def sync_tudo(self, is_desktop=False):
         """Executa ciclo completo de sincronização."""
         if not self.connected: return "Offline"
         
         print("--- Iniciando Sincronização ---")
-        vendas = self.upload_vendas_pendentes()
-        prods = self.download_produtos()
+        
+        # 1. Enviar minhas vendas locais
+        vendas_up = self.upload_vendas_pendentes()
+        
+        # 2. Baixar produtos atualizados (Preços novos, Stock atualizado por outros)
+        prods_down = self.download_produtos()
+        
+        # 3. Se for Desktop, eu quero ver as vendas que fizeram no celular
+        vendas_down = 0
+        if is_desktop:
+            vendas_down = self.download_vendas()
+            # E no desktop, também deveriamos subir atualizacoes de produtos (precos).
+            # Por enquanto, assumimos que o Seed Inicial fez isso, ou criar funcao especifica.
+        
         print("--- Sincronização Finalizada ---")
         
-        return f"Enviados: {vendas or 0} vendas | Baixados: {prods or 0} produtos"
+        return f"UP: {vendas_up} vendas | DOWN: {prods_down} prods, {vendas_down} vendas"
+
+    def verificar_licenca(self, cliente_id):
+        """Verifica se a licença do cliente está ativa e válida."""
+        if not self.connected:
+            # Se offline, permite acesso (famoso 'grace period' ou cache local necessária)
+            # Por segurança MVP: Se offline, deixa entrar.
+            print("Offline: Permitindo acesso temporário.")
+            return {"status": "ativo", "validade": "2099-12-31", "offline": True}
+        
+        try:
+            # Buscar licença pelo ID (ex: numero de telefone ou email)
+            res = self.supabase.table("licencas").select("*").eq("cliente_id", cliente_id).execute()
+            
+            if not res.data:
+                # Não tem licença cadastrada.
+                # Opção A: Bloquear
+                # Opção B: Dar Trial
+                # Vamos retornar 'sem_licenca' para a UI decidir.
+                return {"status": "sem_licenca", "validade": None}
+            
+            licenca = res.data[0]
+            # Verificar data
+            import datetime
+            hoje = datetime.date.today()
+            validade = datetime.datetime.strptime(licenca['data_validade'], "%Y-%m-%d").date()
+            
+            if hoje > validade:
+                 return {"status": "expirado", "validade": licenca['data_validade']}
+            
+            if licenca['status'] != 'ativo':
+                return {"status": "bloqueado", "validade": licenca['data_validade']}
+                
+            return {"status": "ativo", "validade": licenca['data_validade']}
+
+        except Exception as e:
+            print(f"Erro ao verificar licença: {e}")
+            # Em caso de erro (ex: tabela nao existe), libera.
+            return {"status": "erro_verificacao", "msg": str(e)}

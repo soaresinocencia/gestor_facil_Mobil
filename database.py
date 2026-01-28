@@ -666,3 +666,67 @@ def upsert_produto_from_cloud(produto_data):
         print(f"Erro ao sincronizar produto {produto_data.get('nome')}: {e}")
     finally:
         conn.close()
+
+def verificar_se_venda_existe(data_hora, total, vendedor):
+    """Verifica duplicidade de venda vinda da nuvem."""
+    conn = conectar()
+    cursor = conn.cursor()
+    # Margem de erro de 1 segundo na data? ou string exata? 
+    # Supabase retorna ISO com T e Z. SQLite local tem espaco. Precisamos normalizar.
+    # Hack V1: Ignorar segundos finais ou usar LIKE.
+    
+    # Vamos converter o total para float para garantir
+    total = float(total)
+    
+    cursor.execute("""
+        SELECT id FROM vendas 
+        WHERE total_venda = ? AND vendedor_nome = ? AND substr(data_hora, 1, 13) = substr(?, 1, 13)
+    """, (total, vendedor, data_hora))
+    # substr(..., 1, 13) pega YYYY-MM-DD HH (a hora bate).
+    
+    data = cursor.fetchone()
+    conn.close()
+    return data is not None
+
+def registar_venda_importada(venda_data):
+    """Registra uma venda vinda da nuvem no banco local."""
+    conn = conectar()
+    cursor = conn.cursor()
+    
+    # O JSON do itens vem no campo 'itens'
+    itens = venda_data.get('itens', [])
+    if isinstance(itens, str):
+        import json
+        itens = json.loads(itens)
+        
+    # Inserir Venda (Marcamos como synced=1 pois veio da nuvem)
+    cursor.execute('''
+        INSERT INTO vendas (data_hora, total_venda, lucro_total, cliente, sync_status, vendedor_id, vendedor_nome)
+        VALUES (?, ?, ?, ?, 1, NULL, ?)
+    ''', (
+        venda_data['data_hora'], 
+        venda_data['total_venda'], 
+        venda_data['lucro_total'], 
+        venda_data['cliente'], 
+        venda_data.get('vendedor_nome')
+    ))
+    venda_id = cursor.lastrowid
+    
+    # Inserir Itens
+    # Nota: Não baixamos stock aqui novamente pois 'sync_produtos' já atualiza o saldo final.
+    # Mas para histórico fica registrado.
+    for item in itens:
+        # produto_id local pode ser diferente do remoto. Precisamos buscar pelo nome.
+        # sync_produtos ja rodou antes, entao produto deve existir.
+        cursor.execute("SELECT id FROM produtos WHERE nome = ?", (item.get('nome'),))
+        prod_local = cursor.fetchone()
+        prod_id = prod_local['id'] if prod_local else None
+        
+        if prod_id:
+            cursor.execute('''
+                INSERT INTO itens_venda (venda_id, produto_id, quantidade, preco_unitario)
+                VALUES (?, ?, ?, ?)
+            ''', (venda_id, prod_id, item.get('qtd', 0), item.get('preco', 0)))
+            
+    conn.commit()
+    conn.close()
