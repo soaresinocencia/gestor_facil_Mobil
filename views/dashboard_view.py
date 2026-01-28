@@ -47,6 +47,7 @@ class DashboardView(ft.View):
                             ft.Text("Ações Rápidas", size=16, weight=ft.FontWeight.BOLD),
                             self.action_button("Nova Venda", "add_shopping_cart", lambda e: self.page.go("/pos")),
                             self.action_button("Produtos", "inventory", lambda e: self.page.go("/products")),
+                            self.action_button("Sincronizar Cloud", "cloud_sync", self.sync_data),
                         ], scroll=ft.ScrollMode.AUTO),
                         padding=20,
                         expand=True
@@ -63,6 +64,26 @@ class DashboardView(ft.View):
 
     def logout(self, e):
         self.page.go("/login")
+
+    def sync_data(self, e):
+        self.page.show_snack_bar(ft.SnackBar(ft.Text("Iniciando sincronização..."), bgcolor="blue"))
+        self.page.update()
+        
+        try:
+            from sync_service import SyncService
+            service = SyncService()
+            resultado = service.sync_tudo()
+            self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Sucesso: {resultado}"), bgcolor="green"))
+            
+            # Recarregar dados da tela
+            faturamento, lucro, num_vendas = database.get_resumo_hoje()
+            # Atualizar textos dos cards (simplificado: recriar view seria melhor, mas aqui hackeamos pelo update se fosse stateful clean)
+            # Como é view simples, o usuario pode navegar e voltar para ver atualizado.
+            
+        except Exception as ex:
+            self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Erro: {ex}"), bgcolor="red"))
+        
+        self.page.update()
 
     def card_info(self, title, value, icon, icon_color):
         return ft.Container(

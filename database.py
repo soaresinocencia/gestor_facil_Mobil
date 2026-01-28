@@ -10,9 +10,8 @@ try:
     if getattr(sys, 'frozen', False):
         APP_DIR = os.path.dirname(sys.executable)
     else:
-        # Tentar obter diretório do script, fallback para CWD
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
-        APP_DIR = os.path.dirname(BASE_DIR)
+        # Script rodando na raiz
+        APP_DIR = os.path.dirname(os.path.abspath(__file__))
         
     DB_NAME = os.path.join(APP_DIR, "db", "gestor_facil.db")
 except Exception:
@@ -588,3 +587,82 @@ def listar_nomes_produtos():
     nomes = [row['nome'] for row in cursor.fetchall()]
     conn.close()
     return nomes
+
+# --- Funções de Sincronização ---
+
+def get_vendas_nao_sincronizadas():
+    """Retorna todas as vendas com sync_status = 0 (pendentes)."""
+    conn = conectar()
+    # Retornamos dicts para facilitar JSON
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # Pegar vendas
+    cursor.execute("SELECT * FROM vendas WHERE sync_status = 0")
+    vendas = [dict(row) for row in cursor.fetchall()]
+    
+    # Para cada venda, pegar itens
+    for v in vendas:
+        cursor.execute("SELECT * FROM itens_venda WHERE venda_id = ?", (v['id'],))
+        v['itens'] = [dict(row) for row in cursor.fetchall()]
+        
+    conn.close()
+    return vendas
+
+def marcar_venda_como_sincronizada(venda_id):
+    """Atualiza sync_status para 1."""
+    conn = conectar()
+    conn.execute("UPDATE vendas SET sync_status = 1 WHERE id = ?", (venda_id,))
+    conn.commit()
+    conn.close()
+
+def upsert_produto_from_cloud(produto_data):
+    """
+    Atualiza ou cria produto vindo da nuvem.
+    Usa o NOME como chave única por enquanto (simplificação).
+    """
+    conn = conectar()
+    cursor = conn.cursor()
+    
+    try:
+        # Tenta achar pelo nome
+        cursor.execute("SELECT id FROM produtos WHERE nome = ?", (produto_data['nome'],))
+        exists = cursor.fetchone()
+        
+        if exists:
+            # Atualiza (Preços, Detalhes). NÃO atualiza estoque local para não quebrar contagem em andamento?
+            # Estratégia: Nuvem manda no preço, mas somamos estoque? 
+            # Por simplicidade V1: Nuvem sobreescreve tudo (Master-Slave logic)
+            cursor.execute("""
+                UPDATE produtos 
+                SET preco_custo=?, preco_venda=?, quantidade=?, minimo_alerta=?, detalhes=?, categoria=?
+                WHERE id=?
+            """, (
+                produto_data['preco_custo'], 
+                produto_data['preco_venda'], 
+                produto_data['quantidade'], # Cuidado aqui com race condition de estoque
+                produto_data['minimo_alerta'],
+                produto_data.get('detalhes', ''),
+                produto_data.get('categoria', 'Geral'),
+                exists['id']
+            ))
+        else:
+            # Cria novo
+            cursor.execute("""
+                INSERT INTO produtos (nome, preco_custo, preco_venda, quantidade, minimo_alerta, detalhes, categoria)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                produto_data['nome'],
+                produto_data['preco_custo'],
+                produto_data['preco_venda'],
+                produto_data['quantidade'],
+                produto_data['minimo_alerta'],
+                produto_data.get('detalhes', ''),
+                produto_data.get('categoria', 'Geral')
+            ))
+            
+        conn.commit()
+    except Exception as e:
+        print(f"Erro ao sincronizar produto {produto_data.get('nome')}: {e}")
+    finally:
+        conn.close()
