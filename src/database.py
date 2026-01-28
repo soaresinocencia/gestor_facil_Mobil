@@ -6,17 +6,19 @@ from datetime import datetime
 import sys
 
 # Definir caminho do Banco de Dados
-if getattr(sys, 'frozen', False):
-    # Se for executável (PyInstaller)
-    # Pega a pasta onde está o .exe (e não a pasta temporária _internal)
-    APP_DIR = os.path.dirname(sys.executable)
-else:
-    # Se for script Python (Desenvolvimento)
-    # BASE_DIR = src/, PROJECT_ROOT = pasta acima
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
-    APP_DIR = os.path.dirname(BASE_DIR)
-
-DB_NAME = os.path.join(APP_DIR, "db", "gestor_facil.db")
+try:
+    if getattr(sys, 'frozen', False):
+        APP_DIR = os.path.dirname(sys.executable)
+    else:
+        # Tentar obter diretório do script, fallback para CWD
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
+        APP_DIR = os.path.dirname(BASE_DIR)
+        
+    DB_NAME = os.path.join(APP_DIR, "db", "gestor_facil.db")
+except Exception:
+    # Fallback seguro para mobile
+    APP_DIR = os.path.expanduser("~")
+    DB_NAME = os.path.join(APP_DIR, "gestor_facil.db")
 
 def conectar():
     """Conecta ao banco de dados SQLite."""

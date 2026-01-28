@@ -21,7 +21,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install -r src/mobile/requirements.txt
+          pip install -r requirements.txt
           pip install flet
 
       - name: Setup Java
@@ -37,8 +37,8 @@ jobs:
 
       - name: Build APK via Flet
         run: |
-          # Apontamos para o arquivo na raiz para incluir a pasta 'src' corretamente
-          flet build apk --project mobile_entry.py --product "Gestor Facil" --org "com.gestorfacil.mobile" --verbose
+          # Apontamos para o arquivo na raiz
+          flet build apk --project main.py --product "Gestor Facil" --org "com.gestorfacil.mobile" --verbose
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
