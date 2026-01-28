@@ -22,7 +22,6 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install -r requirements.txt
-          pip install flet
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -33,7 +32,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.27.1"
+          flutter-version: "3.24.5"
 
       - name: Build APK via Flet
         run: |
