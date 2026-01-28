@@ -1,5 +1,5 @@
 import flet as ft
-import src.database as database
+import database as database
 
 class LoginView(ft.View):
     def __init__(self, page: ft.Page):

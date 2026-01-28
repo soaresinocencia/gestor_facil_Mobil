@@ -1,5 +1,5 @@
 import flet as ft
-from src import database
+import database
 
 class ProductsView(ft.View):
     def __init__(self, page: ft.Page):
